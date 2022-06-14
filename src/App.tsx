@@ -89,7 +89,6 @@ export default function App() {
       provider.publicKey,
       10000000
     );
-    addLog("tx: " + JSON.stringify(tx));
     const anyTransaction: any = tx;
     anyTransaction.recentBlockhash = (
       await connection.getRecentBlockhash("finalized")
