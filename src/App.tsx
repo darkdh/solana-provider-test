@@ -87,12 +87,14 @@ export default function App() {
       // to wallet address
       new PublicKey("5ofLtZax45EhkNSkoBrDPdWNonKmijMTsW41ckzPs2r5")
     );
-    let tx = createTransferInstruction(
+    let ins = createTransferInstruction(
       from_token_account,
       to_token_account,
       provider.publicKey,
       10000000
     );
+    let tx = new Transaction().add(ins);
+    tx.feePayer = provider.publicKey;
     const anyTransaction: any = tx;
     anyTransaction.recentBlockhash = (
       await connection.getRecentBlockhash("finalized")
