@@ -76,11 +76,15 @@ export default function App() {
   const createSplTokenTransferTransaction = async () => {
     if (!provider.publicKey) return;
     const from_token_account = await getAssociatedTokenAddress(
+      // token mint address
       new PublicKey("D3tynVS3dHGoShEZQcSbsJ69DnoWunhcgya35r5Dtn4p"),
+      // from wallet address
       provider.publicKey
     );
     const to_token_account = await getAssociatedTokenAddress(
+      // token mint address
       new PublicKey("D3tynVS3dHGoShEZQcSbsJ69DnoWunhcgya35r5Dtn4p"),
+      // to wallet address
       new PublicKey("5ofLtZax45EhkNSkoBrDPdWNonKmijMTsW41ckzPs2r5")
     );
     let tx = createTransferInstruction(
