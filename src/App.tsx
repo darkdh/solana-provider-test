@@ -160,7 +160,33 @@ export default function App() {
       addLog("[error] sendTransaction: " + JSON.stringify(err));
     }
   };
+  const signAndSendTransactionRequest = async () => {
+    try {
+      const transaction = await createTransferTransaction();
+      if (!transaction) return;
 
+      const { signature } = await window.solana.request({
+        method: "signAndSendTransaction",
+        params: {
+          message: bs58.encode(transaction.serializeMessage()),
+          option: {
+            // Optional maxRetries?: number
+            maxRetries: 3, // Maximum number of times for the RPC node to retry sending the transaction to the leader.
+            // Optional preflightCommitment?: Commitment
+            preflightCommitment: "confirmed" as Commitment, // preflight commitment level
+            // Optional skipPreflight?: boolean
+            skipPreflight: false, // disable transaction verification step
+          },
+        },
+      });
+      await connection.confirmTransaction(signature);
+
+      addLog("Transaction " + signature.toString() + " confirmed");
+    } catch (err) {
+      console.warn(err);
+      addLog("[error] sendTransaction: " + JSON.stringify(err));
+    }
+  };
   const signAndSendSplTokenTransaction = async () => {
     try {
       const transaction = await createSplTokenTransferTransaction();
@@ -218,7 +244,6 @@ export default function App() {
       });
 
       addLog("signTransaction: " + JSON.stringify(tx));
-      addLog("signature: " + JSON.stringify(tx.signature));
     } catch (err) {
       console.warn(err);
       addLog("[error] signSingleTransction: " + JSON.stringify(err));
@@ -257,10 +282,61 @@ export default function App() {
     }
   };
 
+  const signMultipleTransactionsRequest = async (
+    onlyFirst: boolean = false
+  ) => {
+    try {
+      const [transaction1, transaction2] = await Promise.all([
+        createTransferTransaction(),
+        createTransferTransaction(),
+      ]);
+      if (transaction1 && transaction2) {
+        let txns;
+        if (onlyFirst) {
+          txns = await window.solana.request({
+            method: "signAllTransactions",
+            params: {
+              message: [bs58.encode(transaction1.serializeMessage())],
+            },
+          });
+        } else {
+          txns = await window.solana.request({
+            method: "signAllTransactions",
+            params: {
+              message: [
+                bs58.encode(transaction1.serializeMessage()),
+                bs58.encode(transaction2.serializeMessage()),
+              ],
+            },
+          });
+        }
+        addLog("signMultipleTransactions txns: " + JSON.stringify(txns));
+      }
+    } catch (err) {
+      console.warn(err);
+      addLog("[error] signMultipleTransactions: " + JSON.stringify(err));
+    }
+  };
+
   const signMessage = async (message: string) => {
     try {
       const data = new TextEncoder().encode(message);
       const res = await provider.signMessage(data);
+      addLog("Message signed " + JSON.stringify(res));
+    } catch (err) {
+      console.warn(err);
+      addLog("[error] signMessage: " + JSON.stringify(err));
+    }
+  };
+  const signMessageRequest = async (message: string) => {
+    try {
+      const data = new TextEncoder().encode(message);
+      const res = await window.solana.request({
+        method: "signMessage",
+        params: {
+          message: data,
+        },
+      });
       addLog("Message signed " + JSON.stringify(res));
     } catch (err) {
       console.warn(err);
@@ -323,7 +399,7 @@ export default function App() {
   return (
     <div className="App">
       <main>
-        <h1>Phantom Sandbox</h1>
+        <h1>Brave Wallet Sandbox</h1>
 
         <select
           value={cluster}
@@ -351,6 +427,9 @@ export default function App() {
             <button onClick={signAndSendTransaction}>
               Sign and Send Transaction
             </button>
+            <button onClick={signAndSendTransactionRequest}>
+              Sign and Send Transaction (Request)
+            </button>
             <button onClick={signAndSendSplTokenTransaction}>
               Sign and Send SPL Token Transaction
             </button>
@@ -363,9 +442,15 @@ export default function App() {
             <button onClick={() => signMultipleTransactions(false)}>
               Sign All Transactions (multiple){" "}
             </button>
+            <button onClick={() => signMultipleTransactionsRequest(false)}>
+              Sign All Transactions (multiple) (Request)
+            </button>
 
             <button onClick={() => signMultipleTransactions(true)}>
               Sign All Transactions (single){" "}
+            </button>
+            <button onClick={() => signMultipleTransactionsRequest(true)}>
+              Sign All Transactions (single) (Request)
             </button>
 
             <button
@@ -376,6 +461,15 @@ export default function App() {
               }
             >
               Sign Message
+            </button>
+            <button
+              onClick={() =>
+                signMessageRequest(
+                  "To avoid digital dognappers, sign below to authenticate with CryptoCorgis."
+                )
+              }
+            >
+              Sign Message (Request)
             </button>
 
             <button
@@ -390,6 +484,20 @@ export default function App() {
             >
               Disconnect
             </button>
+            <button
+              onClick={async () => {
+                try {
+                  await window.solana.request({
+                    method: "disconnect",
+                  });
+                } catch (err) {
+                  console.warn(err);
+                  addLog("[error] disconnect: " + JSON.stringify(err));
+                }
+              }}
+            >
+              Disconnect (Request)
+            </button>
           </>
         ) : (
           <>
@@ -403,7 +511,48 @@ export default function App() {
                 }
               }}
             >
-              Connect to Phantom
+              Connect
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  await window.solana.request({
+                    method: "connect",
+                  });
+                } catch (err) {
+                  console.warn(err);
+                  addLog("[error] connect: " + JSON.stringify(err));
+                }
+              }}
+            >
+              Connect (Request)
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  await provider.connect({ onlyIfTrusted: true });
+                } catch (err) {
+                  console.warn(err);
+                  addLog("[error] eagerly connect: " + JSON.stringify(err));
+                }
+              }}
+            >
+              Eagerly Connect
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  await window.solana.request({
+                    method: "connect",
+                    params: { onlyIfTrusted: true },
+                  });
+                } catch (err) {
+                  console.warn(err);
+                  addLog("[error] eagerly connect: " + JSON.stringify(err));
+                }
+              }}
+            >
+              Eagerly Connect (Request)
             </button>
           </>
         )}
