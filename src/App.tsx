@@ -318,25 +318,44 @@ export default function App() {
     }
   };
 
-  const signMessage = async (message: string) => {
+  const signMessage = async (message: string, useHex: boolean = false) => {
     try {
       const data = new TextEncoder().encode(message);
-      const res = await provider.signMessage(data);
+      let res = {};
+      if (!useHex) {
+        res = await provider.signMessage(data);
+      } else {
+        res = await provider.signMessage(data, "hex");
+      }
       addLog("Message signed " + JSON.stringify(res));
     } catch (err) {
       console.warn(err);
       addLog("[error] signMessage: " + JSON.stringify(err));
     }
   };
-  const signMessageRequest = async (message: string) => {
+  const signMessageRequest = async (
+    message: string,
+    useHex: boolean = false
+  ) => {
     try {
       const data = new TextEncoder().encode(message);
-      const res = await window.solana.request({
-        method: "signMessage",
-        params: {
-          message: data,
-        },
-      });
+      let res = {};
+      if (!useHex) {
+        res = await window.solana.request({
+          method: "signMessage",
+          params: {
+            message: data,
+          },
+        });
+      } else {
+        res = await window.solana.request({
+          method: "signMessage",
+          params: {
+            message: data,
+            display: "hex",
+          },
+        });
+      }
       addLog("Message signed " + JSON.stringify(res));
     } catch (err) {
       console.warn(err);
@@ -471,7 +490,26 @@ export default function App() {
             >
               Sign Message (Request)
             </button>
-
+            <button
+              onClick={() =>
+                signMessage(
+                  "To avoid digital dognappers, sign below to authenticate with CryptoCorgis.",
+                  true
+                )
+              }
+            >
+              Sign Message (Hex display)
+            </button>
+            <button
+              onClick={() =>
+                signMessageRequest(
+                  "To avoid digital dognappers, sign below to authenticate with CryptoCorgis.",
+                  true
+                )
+              }
+            >
+              Sign Message (Hex display + Request)
+            </button>
             <button
               onClick={async () => {
                 try {
