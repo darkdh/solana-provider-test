@@ -3,6 +3,8 @@ import {
   Connection,
   PublicKey,
   Transaction,
+  VersionedTransaction,
+  TransactionMessage,
   clusterApiUrl,
   SystemProgram,
   Cluster,
@@ -128,6 +130,32 @@ export default function App() {
     return transaction;
   };
 
+  const createTransferTransactionV0 = async () => {
+    if (!provider.publicKey) return;
+
+    // get latest `blockhash`
+    let blockhash = await connection.getLatestBlockhash("finalized").then((res) => res.blockhash);
+
+    const instructions = [
+      SystemProgram.transfer({
+        fromPubkey: provider.publicKey,
+        toPubkey: provider.publicKey,
+        lamports: 100,
+      }),
+    ];
+
+    // create v0 compatible message
+    const messageV0 = new TransactionMessage({
+      payerKey: provider.publicKey,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message();
+
+    // make a versioned transaction
+    const transactionV0 = new VersionedTransaction(messageV0);
+    return transactionV0;
+  };
+
   const signAndSendTransaction = async () => {
     try {
       const transaction = await createTransferTransaction();
@@ -140,7 +168,6 @@ export default function App() {
       // addLog("Submitted transaction " + signature + ", awaiting confirmation");
 
       // brave
-      // const { signature } = await window.solana.signAndSendTransaction(
       const { signature } = await window.solana.signAndSendTransaction(
         transaction,
         {
@@ -160,6 +187,32 @@ export default function App() {
       addLog("[error] sendTransaction: " + JSON.stringify(err));
     }
   };
+
+  const signAndSendTransactionV0 = async () => {
+    try {
+      const transactionV0 = await createTransferTransactionV0();
+      if (!transactionV0) return;
+
+      const { signature } = await window.solana.signAndSendTransaction(
+        transactionV0,
+        {
+          // Optional maxRetries?: number
+          maxRetries: 3, // Maximum number of times for the RPC node to retry sending the transaction to the leader.
+          // Optional preflightCommitment?: Commitment
+          preflightCommitment: "finalized" as Commitment, // preflight commitment level
+          // Optional skipPreflight?: boolean
+          skipPreflight: false, // disable transaction verification step
+        }
+      );
+      await connection.confirmTransaction(signature);
+
+      addLog("Transaction " + signature.toString() + " confirmed");
+    } catch (err) {
+      console.warn(err);
+      addLog("[error] sendTransaction: " + JSON.stringify(err));
+    }
+  };
+
   const signAndSendTransactionRequest = async () => {
     try {
       const transaction = await createTransferTransaction();
@@ -444,7 +497,10 @@ export default function App() {
             </div>
 
             <button onClick={signAndSendTransaction}>
-              Sign and Send Transaction
+              Sign and Send Transaction (Legacy)
+            </button>
+            <button onClick={signAndSendTransactionV0}>
+              Sign and Send Transaction (v0)
             </button>
             <button onClick={signAndSendTransactionRequest}>
               Sign and Send Transaction (Request)
