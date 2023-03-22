@@ -5,6 +5,7 @@ import {
   Transaction,
   VersionedTransaction,
   TransactionMessage,
+  AddressLookupTableProgram,
   clusterApiUrl,
   SystemProgram,
   Cluster,
@@ -57,6 +58,10 @@ const getProvider = (): PhantomProvider | undefined => {
   }
   window.open("https://phantom.app/", "_blank");
 };
+
+// Fund will be sent to this account when you're testing v0 transaction with
+// lookup table. This is a test only account, please don't send funds on mainnet.
+const kTestToPublicKeyInTableLookup = new PublicKey("Ed8JG8SuyLgG6A9Km3PSKtVD8a4Xoqr6cATfswZKbQCW");
 
 export default function App() {
   const [logs, setLogs] = useState<string[]>([]);
@@ -134,7 +139,7 @@ export default function App() {
     if (!provider.publicKey) return;
 
     // get latest `blockhash`
-    let blockhash = await connection.getLatestBlockhash("finalized").then((res) => res.blockhash);
+    let blockhash = await connection.getLatestBlockhash().then((res) => res.blockhash);
 
     const instructions = [
       SystemProgram.transfer({
@@ -156,32 +161,115 @@ export default function App() {
     return transactionV0;
   };
 
+  const callSignAndSendTransaction = async (
+    transaction: Transaction | VersionedTransaction,
+    preflightCommitment: Commitment) => {
+    const { signature } = await window.solana.signAndSendTransaction(
+      transaction,
+      {
+        // Optional maxRetries?: number
+        maxRetries: 3, // Maximum number of times for the RPC node to retry sending the transaction to the leader.
+        // Optional preflightCommitment?: Commitment
+        preflightCommitment: preflightCommitment, // preflight commitment level
+        // Optional skipPreflight?: boolean
+        skipPreflight: false, // disable transaction verification step
+      }
+    );
+    await connection.confirmTransaction(signature);
+    addLog("Transaction " + signature.toString() + " confirmed");
+    return signature
+  };
+
+  const createAddressLookupTable = async () => {
+    if (!provider.publicKey) return;
+    // get latest `blockhash`
+    let blockhash = await connection.getLatestBlockhash().then((res) => res.blockhash);
+    // get current `slot`
+    let slot = await connection.getSlot();
+
+    // create an Address Lookup Table
+    const [lookupTableInst, lookupTableAddress] = AddressLookupTableProgram.createLookupTable({
+      authority: provider.publicKey,
+      payer: provider.publicKey,
+      recentSlot: slot,
+    });
+
+    addLog("lookup table address: " + lookupTableAddress.toBase58());
+
+    // To create the Address Lookup Table on chain:
+    // send the `lookupTableInst` instruction in a transaction
+    const lookupMessage = new TransactionMessage({
+      payerKey: provider.publicKey,
+      recentBlockhash: blockhash,
+      instructions: [lookupTableInst],
+    }).compileToV0Message();
+
+    const lookupTransaction = new VersionedTransaction(lookupMessage);
+    const lookupSignature = await callSignAndSendTransaction(lookupTransaction, "finalized");
+    addLog("Sent transaction for lookup table: " + lookupSignature);
+
+    return lookupTableAddress
+  };
+
+  const extendAddressLookupTable = async (lookupTableAddress: PublicKey) => {
+    if (!provider.publicKey) return;
+    // get latest `blockhash`
+    let blockhash = await connection.getLatestBlockhash().then((res) => res.blockhash);
+
+    // add addresses to the `lookupTableAddress` table via an `extend` instruction
+    const extendInstruction = AddressLookupTableProgram.extendLookupTable({
+      payer: provider.publicKey,
+      authority: provider.publicKey,
+      lookupTable: lookupTableAddress,
+      addresses: [
+        provider.publicKey,
+        kTestToPublicKeyInTableLookup,
+      ],
+    });
+
+    // Send this `extendInstruction` in a transaction to the cluster
+    // to insert the listing of `addresses` into your lookup table with address `lookupTableAddress`
+    const extensionMessage = new TransactionMessage({
+      payerKey: provider.publicKey,
+      recentBlockhash: blockhash,
+      instructions: [extendInstruction],
+    }).compileToV0Message();
+
+    const extensionTransaction = new VersionedTransaction(extensionMessage);
+    const extensionSignature = await callSignAndSendTransaction(extensionTransaction, "finalized");
+    addLog("Sent transaction for extending lookup table: " + extensionSignature);
+  };
+
+  const createTransferTransactionV0WithLookupTable = async (lookupTableAddress: PublicKey) => {
+    if (!provider.publicKey) return;
+    // get the table from the cluster
+    const lookupTableAccount = await connection.getAddressLookupTable(lookupTableAddress).then((res) => res.value);
+    // get latest `blockhash`
+    let blockhash = await connection.getLatestBlockhash().then((res) => res.blockhash);
+
+    const instructions = [
+      SystemProgram.transfer({
+        fromPubkey: provider.publicKey,
+        toPubkey: kTestToPublicKeyInTableLookup,
+        lamports: 100,
+      }),
+    ];
+
+    const messageV0 = new TransactionMessage({
+      payerKey: provider.publicKey,
+      recentBlockhash: blockhash,
+      instructions,
+    }).compileToV0Message([lookupTableAccount]);
+
+    const transactionV0 = new VersionedTransaction(messageV0);
+    return transactionV0;
+  };
+
   const signAndSendTransaction = async () => {
     try {
       const transaction = await createTransferTransaction();
       if (!transaction) return;
-
-      // phantom
-      // let signed = await provider.signTransaction(transaction);
-      // addLog("Got signature, submitting transaction");
-      // let signature = await connection.sendRawTransaction(signed.serialize());
-      // addLog("Submitted transaction " + signature + ", awaiting confirmation");
-
-      // brave
-      const { signature } = await window.solana.signAndSendTransaction(
-        transaction,
-        {
-          // Optional maxRetries?: number
-          maxRetries: 3, // Maximum number of times for the RPC node to retry sending the transaction to the leader.
-          // Optional preflightCommitment?: Commitment
-          preflightCommitment: "confirmed" as Commitment, // preflight commitment level
-          // Optional skipPreflight?: boolean
-          skipPreflight: false, // disable transaction verification step
-        }
-      );
-      await connection.confirmTransaction(signature);
-
-      addLog("Transaction " + signature.toString() + " confirmed");
+      await callSignAndSendTransaction(transaction, "finalized");
     } catch (err) {
       console.warn(err);
       addLog("[error] sendTransaction: " + JSON.stringify(err));
@@ -192,21 +280,20 @@ export default function App() {
     try {
       const transactionV0 = await createTransferTransactionV0();
       if (!transactionV0) return;
+      await callSignAndSendTransaction(transactionV0, "finalized");
+    } catch (err) {
+      console.warn(err);
+      addLog("[error] sendTransaction: " + JSON.stringify(err));
+    }
+  };
 
-      const { signature } = await window.solana.signAndSendTransaction(
-        transactionV0,
-        {
-          // Optional maxRetries?: number
-          maxRetries: 3, // Maximum number of times for the RPC node to retry sending the transaction to the leader.
-          // Optional preflightCommitment?: Commitment
-          preflightCommitment: "finalized" as Commitment, // preflight commitment level
-          // Optional skipPreflight?: boolean
-          skipPreflight: false, // disable transaction verification step
-        }
-      );
-      await connection.confirmTransaction(signature);
-
-      addLog("Transaction " + signature.toString() + " confirmed");
+  const signAndSendTransactionV0WithLookupTable = async () => {
+    try {
+      const lookupTableAddress = await createAddressLookupTable();
+      await extendAddressLookupTable(lookupTableAddress);
+      const transactionV0 = await createTransferTransactionV0WithLookupTable(lookupTableAddress);
+      if (!transactionV0) return;
+      await callSignAndSendTransaction(transactionV0, "finalized");
     } catch (err) {
       console.warn(err);
       addLog("[error] sendTransaction: " + JSON.stringify(err));
@@ -501,6 +588,9 @@ export default function App() {
             </button>
             <button onClick={signAndSendTransactionV0}>
               Sign and Send Transaction (v0)
+            </button>
+            <button onClick={signAndSendTransactionV0WithLookupTable}>
+              Sign and Send Transaction (v0 + lookup table)
             </button>
             <button onClick={signAndSendTransactionRequest}>
               Sign and Send Transaction (Request)
