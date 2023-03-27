@@ -180,6 +180,7 @@ export default function App() {
     return signature
   };
 
+  /*
   const createAddressLookupTable = async () => {
     if (!provider.publicKey) return;
     // get latest `blockhash`
@@ -239,6 +240,7 @@ export default function App() {
     const extensionSignature = await callSignAndSendTransaction(extensionTransaction, "finalized");
     addLog("Sent transaction for extending lookup table: " + extensionSignature);
   };
+  */
 
   const createTransferTransactionV0WithLookupTable = async (lookupTableAddress: PublicKey) => {
     if (!provider.publicKey) return;
@@ -289,8 +291,11 @@ export default function App() {
 
   const signAndSendTransactionV0WithLookupTable = async () => {
     try {
-      const lookupTableAddress = await createAddressLookupTable();
-      await extendAddressLookupTable(lookupTableAddress);
+      // const lookupTableAddress = await createAddressLookupTable();
+      // await extendAddressLookupTable(lookupTableAddress);
+      // This address table lookup account was created by above two lines and
+      // only on devnet.
+      const lookupTableAddress = new PublicKey("CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu");
       const transactionV0 = await createTransferTransactionV0WithLookupTable(lookupTableAddress);
       if (!transactionV0) return;
       await callSignAndSendTransaction(transactionV0, "finalized");
@@ -590,7 +595,7 @@ export default function App() {
               Sign and Send Transaction (v0)
             </button>
             <button onClick={signAndSendTransactionV0WithLookupTable}>
-              Sign and Send Transaction (v0 + lookup table)
+              Sign and Send Transaction (v0 + lookup table) (devnet only)
             </button>
             <button onClick={signAndSendTransactionRequest}>
               Sign and Send Transaction (Request)
