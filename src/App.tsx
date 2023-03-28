@@ -386,13 +386,20 @@ export default function App() {
       addLog("[error] signSingleTransaction: " + JSON.stringify(err));
     }
   };
-  const signSingleTransactionRequest = async () => {
+  const signSingleTransactionRequest = async (v0: boolean = false) => {
     try {
-      const transaction = await createTransferTransaction();
+      let transaction, message;
+      if (v0) {
+        transaction = await createTransferTransactionV0();
+        message = bs58.encode(transaction.message.serialize());
+      } else {
+        transaction = await createTransferTransaction();
+        message = bs58.encode(transaction.serializeMessage());
+      }
       const tx = await window.solana.request({
         method: "signTransaction",
         params: {
-          message: bs58.encode(transaction.serializeMessage()),
+          message: message
         },
       });
 
@@ -450,30 +457,49 @@ export default function App() {
   };
 
   const signMultipleTransactionsRequest = async (
-    onlyFirst: boolean = false
+    onlyFirst: boolean = false, v0: boolean = false
   ) => {
     try {
-      const [transaction1, transaction2] = await Promise.all([
-        createTransferTransaction(),
-        createTransferTransaction(),
-      ]);
+      let transaction1, transaction2
+      if (v0) {
+        [transaction1, transaction2] = await Promise.all([
+          createTransferTransactionV0(),
+          createTransferTransactionV0(),
+        ]);
+      } else {
+        [transaction1, transaction2] = await Promise.all([
+          createTransferTransaction(),
+          createTransferTransaction(),
+        ]);
+      }
       if (transaction1 && transaction2) {
         let txns;
         if (onlyFirst) {
+          let message;
+          if (v0) {
+            message = bs58.encode(transaction1.message.serialize());
+          } else {
+            message = bs58.encode(transaction1.serializeMessage());
+          }
           txns = await window.solana.request({
             method: "signAllTransactions",
             params: {
-              message: [bs58.encode(transaction1.serializeMessage())],
+              message: [message],
             },
           });
         } else {
+          let message1, message2;
+          if (v0) {
+            message1 = bs58.encode(transaction1.message.serialize());
+            message2 = bs58.encode(transaction2.message.serialize());
+          } else {
+            message1 = bs58.encode(transaction1.serializeMessage());
+            message2 = bs58.encode(transaction2.serializeMessage());
+          }
           txns = await window.solana.request({
             method: "signAllTransactions",
             params: {
-              message: [
-                bs58.encode(transaction1.serializeMessage()),
-                bs58.encode(transaction2.serializeMessage()),
-              ],
+              message: [message1, message2],
             },
           });
         }
@@ -629,11 +655,14 @@ export default function App() {
             <button onClick={() => signSingleTransaction(false, false)}>
               Sign Transaction
             </button>
-            <button onClick={signSingleTransactionRequest}>
+            <button onClick={() => signSingleTransactionRequest(false)}>
               Sign Transaction (Request)
             </button>
             <button onClick={() => signSingleTransaction(true, false)}>
               Sign Transaction (v0)
+            </button>
+            <button onClick={() => signSingleTransactionRequest(true)}>
+              Sign Transaction (v0) (Request)
             </button>
             <button onClick={() => signSingleTransaction(true, true)}>
               Sign Transaction (v0 + lookup table)
@@ -642,11 +671,14 @@ export default function App() {
             <button onClick={() => signMultipleTransactions(false)}>
               Sign All Transactions (multiple){" "}
             </button>
-            <button onClick={() => signMultipleTransactionsRequest(false)}>
+            <button onClick={() => signMultipleTransactionsRequest(false, false)}>
               Sign All Transactions (multiple) (Request)
             </button>
             <button onClick={() => signMultipleTransactions(false, true, false)}>
               Sign All Transactions (multiple) (v0)
+            </button>
+            <button onClick={() => signMultipleTransactionsRequest(false, true)}>
+              Sign All Transactions (multiple) (v0) (Request)
             </button>
             <button onClick={() => signMultipleTransactions(false, true, true)}>
               Sign All Transactions (multiple) (v0 + lookup table)
@@ -655,7 +687,7 @@ export default function App() {
             <button onClick={() => signMultipleTransactions(true)}>
               Sign All Transactions (single){" "}
             </button>
-            <button onClick={() => signMultipleTransactionsRequest(true)}>
+            <button onClick={() => signMultipleTransactionsRequest(true, false)}>
               Sign All Transactions (single) (Request)
             </button>
 
