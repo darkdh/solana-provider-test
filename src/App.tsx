@@ -365,9 +365,17 @@ export default function App() {
     }
   };
 
-  const signSingleTransction = async () => {
+  const signSingleTransaction = async (v0: boolean = false, lookupTable: boolean = false) => {
     try {
-      const transaction = await createTransferTransaction();
+      let transaction;
+      if (v0 && lookupTable) {
+        const lookupTableAddress = new PublicKey("CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu");
+        transaction = await createTransferTransactionV0WithLookupTable(lookupTableAddress);
+      } else if (v0) {
+        transaction = await createTransferTransactionV0();
+      } else {
+        transaction = await createTransferTransaction();
+      }
       console.log(transaction);
       const tx = await window.solana.signTransaction(transaction);
       addLog("signTransaction: " + JSON.stringify(tx));
@@ -375,10 +383,10 @@ export default function App() {
       addLog("signature: " + JSON.stringify(signature));
     } catch (err) {
       console.warn(err);
-      addLog("[error] signSingleTransction: " + JSON.stringify(err));
+      addLog("[error] signSingleTransaction: " + JSON.stringify(err));
     }
   };
-  const signSingleTransctionRequest = async () => {
+  const signSingleTransactionRequest = async () => {
     try {
       const transaction = await createTransferTransaction();
       const tx = await window.solana.request({
@@ -391,16 +399,30 @@ export default function App() {
       addLog("signTransaction: " + JSON.stringify(tx));
     } catch (err) {
       console.warn(err);
-      addLog("[error] signSingleTransction: " + JSON.stringify(err));
+      addLog("[error] signSingleTransaction: " + JSON.stringify(err));
     }
   };
 
-  const signMultipleTransactions = async (onlyFirst: boolean = false) => {
+  const signMultipleTransactions = async (onlyFirst: boolean = false, v0: boolean = false, lookupTable: boolean = false) => {
     try {
-      const [transaction1, transaction2] = await Promise.all([
-        createTransferTransaction(),
-        createTransferTransaction(),
-      ]);
+      let transaction1, transaction2;
+      if (v0 && lookupTable) {
+        const lookupTableAddress = new PublicKey("CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu");
+        [transaction1, transaction2] = await Promise.all([
+          createTransferTransactionV0WithLookupTable(lookupTableAddress),
+          createTransferTransactionV0WithLookupTable(lookupTableAddress),
+        ]);
+      } else if (v0) {
+        [transaction1, transaction2] = await Promise.all([
+          createTransferTransactionV0(),
+          createTransferTransactionV0(),
+        ]);
+      } else {
+        [transaction1, transaction2] = await Promise.all([
+          createTransferTransaction(),
+          createTransferTransaction(),
+        ]);
+      }
       if (transaction1 && transaction2) {
         let txns;
         if (onlyFirst) {
@@ -604,9 +626,17 @@ export default function App() {
               Sign and Send SPL Token Transaction
             </button>
 
-            <button onClick={signSingleTransction}>Sign Transaction </button>
-            <button onClick={signSingleTransctionRequest}>
+            <button onClick={() => signSingleTransaction(false, false)}>
+              Sign Transaction
+            </button>
+            <button onClick={signSingleTransactionRequest}>
               Sign Transaction (Request)
+            </button>
+            <button onClick={() => signSingleTransaction(true, false)}>
+              Sign Transaction (v0)
+            </button>
+            <button onClick={() => signSingleTransaction(true, true)}>
+              Sign Transaction (v0 + lookup table)
             </button>
 
             <button onClick={() => signMultipleTransactions(false)}>
@@ -614,6 +644,12 @@ export default function App() {
             </button>
             <button onClick={() => signMultipleTransactionsRequest(false)}>
               Sign All Transactions (multiple) (Request)
+            </button>
+            <button onClick={() => signMultipleTransactions(false, true, false)}>
+              Sign All Transactions (multiple) (v0)
+            </button>
+            <button onClick={() => signMultipleTransactions(false, true, true)}>
+              Sign All Transactions (multiple) (v0 + lookup table)
             </button>
 
             <button onClick={() => signMultipleTransactions(true)}>
