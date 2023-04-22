@@ -61,7 +61,9 @@ const getProvider = (): PhantomProvider | undefined => {
 
 // Fund will be sent to this account when you're testing v0 transaction with
 // lookup table. This is a test only account, please don't send funds on mainnet.
-const kTestToPublicKeyInTableLookup = new PublicKey("Ed8JG8SuyLgG6A9Km3PSKtVD8a4Xoqr6cATfswZKbQCW");
+const kTestToPublicKeyInTableLookup = new PublicKey(
+  "Ed8JG8SuyLgG6A9Km3PSKtVD8a4Xoqr6cATfswZKbQCW"
+);
 
 export default function App() {
   const [logs, setLogs] = useState<string[]>([]);
@@ -139,7 +141,9 @@ export default function App() {
     if (!provider.publicKey) return;
 
     // get latest `blockhash`
-    let blockhash = await connection.getLatestBlockhash().then((res) => res.blockhash);
+    let blockhash = await connection
+      .getLatestBlockhash()
+      .then((res) => res.blockhash);
 
     const instructions = [
       SystemProgram.transfer({
@@ -163,7 +167,8 @@ export default function App() {
 
   const callSignAndSendTransaction = async (
     transaction: Transaction | VersionedTransaction,
-    preflightCommitment: Commitment) => {
+    preflightCommitment: Commitment
+  ) => {
     const { signature } = await window.solana.signAndSendTransaction(
       transaction,
       {
@@ -177,7 +182,7 @@ export default function App() {
     );
     await connection.confirmTransaction(signature);
     addLog("Transaction " + signature.toString() + " confirmed");
-    return signature
+    return signature;
   };
 
   /*
@@ -242,12 +247,18 @@ export default function App() {
   };
   */
 
-  const createTransferTransactionV0WithLookupTable = async (lookupTableAddress: PublicKey) => {
+  const createTransferTransactionV0WithLookupTable = async (
+    lookupTableAddress: PublicKey
+  ) => {
     if (!provider.publicKey) return;
     // get the table from the cluster
-    const lookupTableAccount = await connection.getAddressLookupTable(lookupTableAddress).then((res) => res.value);
+    const lookupTableAccount = await connection
+      .getAddressLookupTable(lookupTableAddress)
+      .then((res) => res.value);
     // get latest `blockhash`
-    let blockhash = await connection.getLatestBlockhash().then((res) => res.blockhash);
+    let blockhash = await connection
+      .getLatestBlockhash()
+      .then((res) => res.blockhash);
 
     const instructions = [
       SystemProgram.transfer({
@@ -295,8 +306,12 @@ export default function App() {
       // await extendAddressLookupTable(lookupTableAddress);
       // This address table lookup account was created by above two lines and
       // only on devnet.
-      const lookupTableAddress = new PublicKey("CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu");
-      const transactionV0 = await createTransferTransactionV0WithLookupTable(lookupTableAddress);
+      const lookupTableAddress = new PublicKey(
+        "CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu"
+      );
+      const transactionV0 = await createTransferTransactionV0WithLookupTable(
+        lookupTableAddress
+      );
       if (!transactionV0) return;
       await callSignAndSendTransaction(transactionV0, "finalized");
     } catch (err) {
@@ -365,12 +380,19 @@ export default function App() {
     }
   };
 
-  const signSingleTransaction = async (v0: boolean = false, lookupTable: boolean = false) => {
+  const signSingleTransaction = async (
+    v0: boolean = false,
+    lookupTable: boolean = false
+  ) => {
     try {
       let transaction;
       if (v0 && lookupTable) {
-        const lookupTableAddress = new PublicKey("CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu");
-        transaction = await createTransferTransactionV0WithLookupTable(lookupTableAddress);
+        const lookupTableAddress = new PublicKey(
+          "CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu"
+        );
+        transaction = await createTransferTransactionV0WithLookupTable(
+          lookupTableAddress
+        );
       } else if (v0) {
         transaction = await createTransferTransactionV0();
       } else {
@@ -399,7 +421,7 @@ export default function App() {
       const tx = await window.solana.request({
         method: "signTransaction",
         params: {
-          message: message
+          message: message,
         },
       });
 
@@ -410,11 +432,17 @@ export default function App() {
     }
   };
 
-  const signMultipleTransactions = async (onlyFirst: boolean = false, v0: boolean = false, lookupTable: boolean = false) => {
+  const signMultipleTransactions = async (
+    onlyFirst: boolean = false,
+    v0: boolean = false,
+    lookupTable: boolean = false
+  ) => {
     try {
       let transaction1, transaction2;
       if (v0 && lookupTable) {
-        const lookupTableAddress = new PublicKey("CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu");
+        const lookupTableAddress = new PublicKey(
+          "CE7eEn3x97iC1qRZPvpJJk2AuPzwchQ6RHSy6f1U1jxu"
+        );
         [transaction1, transaction2] = await Promise.all([
           createTransferTransactionV0WithLookupTable(lookupTableAddress),
           createTransferTransactionV0WithLookupTable(lookupTableAddress),
@@ -456,11 +484,61 @@ export default function App() {
     }
   };
 
+  const signTransactionWithInvalidBlockhash = async () => {
+    try {
+      let transaction = await createTransferTransaction();
+      transaction.recentBlockhash =
+        "J7rBdM6AecPDEZp8aPq5iPSNKVkU5Q76F3oAV4eW5wsW";
+      addLog("transaction: " + JSON.stringify(transaction));
+      const tx = await window.solana.signTransaction(transaction);
+      addLog("signTransaction: " + JSON.stringify(tx));
+      const signature = await connection.sendRawTransaction(tx.serialize());
+      addLog("signature: " + JSON.stringify(signature));
+    } catch (err) {
+      addLog(
+        "[error] signTransactionWithInvalidBlockhash: " + JSON.stringify(err)
+      );
+    }
+  };
+
+  const signAllTransactionsWithInvalidBlockhash = async () => {
+    try {
+      let transaction1 = await createTransferTransaction();
+      let transaction2 = await createTransferTransaction();
+      transaction2.recentBlockhash =
+        "J7rBdM6AecPDEZp8aPq5iPSNKVkU5Q76F3oAV4eW5wsW";
+      addLog("transaction1: " + JSON.stringify(transaction1));
+      addLog("transaction2: " + JSON.stringify(transaction2));
+      let txns = await window.solana.signAllTransactions([
+        transaction1,
+        transaction2,
+      ]);
+
+      addLog(
+        "signAllTransactionsWithInvalidBlockhash txns: " + JSON.stringify(txns)
+      );
+
+      const sentTxs = await Promise.all(
+        txns.map(async (tx) => {
+          return connection.sendRawTransaction(tx.serialize());
+        })
+      );
+
+      addLog("sent raw txns: " + JSON.stringify(sentTxs));
+    } catch (err) {
+      addLog(
+        "[error] signAllTransactionsWithInvalidBlockhash: " +
+          JSON.stringify(err)
+      );
+    }
+  };
+
   const signMultipleTransactionsRequest = async (
-    onlyFirst: boolean = false, v0: boolean = false
+    onlyFirst: boolean = false,
+    v0: boolean = false
   ) => {
     try {
-      let transaction1, transaction2
+      let transaction1, transaction2;
       if (v0) {
         [transaction1, transaction2] = await Promise.all([
           createTransferTransactionV0(),
@@ -655,6 +733,9 @@ export default function App() {
             <button onClick={() => signSingleTransaction(false, false)}>
               Sign Transaction
             </button>
+            <button onClick={() => signTransactionWithInvalidBlockhash()}>
+              Sign Transaction (Invalid blockhash)
+            </button>
             <button onClick={() => signSingleTransactionRequest(false)}>
               Sign Transaction (Request)
             </button>
@@ -671,13 +752,22 @@ export default function App() {
             <button onClick={() => signMultipleTransactions(false)}>
               Sign All Transactions (multiple){" "}
             </button>
-            <button onClick={() => signMultipleTransactionsRequest(false, false)}>
+            <button onClick={() => signAllTransactionsWithInvalidBlockhash()}>
+              Sign All Transactions (Invalid blockhash)
+            </button>
+            <button
+              onClick={() => signMultipleTransactionsRequest(false, false)}
+            >
               Sign All Transactions (multiple) (Request)
             </button>
-            <button onClick={() => signMultipleTransactions(false, true, false)}>
+            <button
+              onClick={() => signMultipleTransactions(false, true, false)}
+            >
               Sign All Transactions (multiple) (v0)
             </button>
-            <button onClick={() => signMultipleTransactionsRequest(false, true)}>
+            <button
+              onClick={() => signMultipleTransactionsRequest(false, true)}
+            >
               Sign All Transactions (multiple) (v0) (Request)
             </button>
             <button onClick={() => signMultipleTransactions(false, true, true)}>
@@ -687,7 +777,9 @@ export default function App() {
             <button onClick={() => signMultipleTransactions(true)}>
               Sign All Transactions (single){" "}
             </button>
-            <button onClick={() => signMultipleTransactionsRequest(true, false)}>
+            <button
+              onClick={() => signMultipleTransactionsRequest(true, false)}
+            >
               Sign All Transactions (single) (Request)
             </button>
 
